@@ -1,0 +1,1018 @@
+This document contains all VBA modules used in the FreshMart Retail Sales Analytics project. Each module is responsible for automating a specific workflow within the Excel system.
+
+MODULE 1 — SubmitTransaction
+
+' ================================================================
+' SUB: SaveToSalesData (Save current entry to database)
+' ================================================================
+Sub SaveToSalesData()
+    
+    Dim wsData As Worksheet
+    Dim wsSales As Worksheet
+    Dim lastRow As Long
+    Dim response As VbMsgBoxResult
+    Dim i As Long
+    Dim missingFields As String
+    Dim isValid As Boolean
+    
+    On Error GoTo ErrorHandler
+    
+    Set wsData = ThisWorkbook.Worksheets("Data Entry")
+    
+    ' =============================================================
+    ' VALIDATE REQUIRED FIELDS
+    ' =============================================================
+    isValid = True
+    missingFields = ""
+    
+    ' Check each required field
+    If wsData.Range("G5").Value = "" Then
+        missingFields = missingFields & "• Date" & vbCrLf
+        isValid = False
+    End If
+    
+    If wsData.Range("G8").Value = "" Then
+        missingFields = missingFields & "• Region" & vbCrLf
+        isValid = False
+    End If
+    
+    If wsData.Range("G10").Value = "" Then
+        missingFields = missingFields & "• Product" & vbCrLf
+        isValid = False
+    End If
+    
+    If wsData.Range("G12").Value = "" Or wsData.Range("G12").Value <= 0 Then
+        missingFields = missingFields & "• Unit Price (must be > 0)" & vbCrLf
+        isValid = False
+    End If
+    
+    If wsData.Range("G13").Value = "" Or wsData.Range("G13").Value <= 0 Then
+        missingFields = missingFields & "• Quantity (must be > 0)" & vbCrLf
+        isValid = False
+    End If
+    
+    ' Show validation error if needed
+    If Not isValid Then
+        MsgBox "Please complete the following required fields before saving:" & vbCrLf & vbCrLf & _
+               missingFields & vbCrLf & _
+               "All yellow cells must be filled correctly.", _
+               vbExclamation, "Missing Required Fields"
+        Exit Sub
+    End If
+    
+    ' =============================================================
+    ' CREATE SALES DATA SHEET IF NOT EXISTS
+    ' =============================================================
+    On Error Resume Next
+    Set wsSales = ThisWorkbook.Worksheets("Sales Data")
+    On Error GoTo ErrorHandler
+    
+    If wsSales Is Nothing Then
+        response = MsgBox("'Sales Data' worksheet not found." & vbCrLf & _
+                          "Do you want to create it and save this entry?", _
+                          vbQuestion + vbYesNo, "Create Sales Data Database?")
+        
+        If response = vbYes Then
+            Set wsSales = ThisWorkbook.Worksheets.Add
+            wsSales.Name = "Sales Data"
+            wsSales.Move After:=ThisWorkbook.Worksheets(ThisWorkbook.Worksheets.Count)
+            
+            ' Create headers (19 columns)
+            Dim headers As Variant
+            headers = Array( _
+                "Transaction ID", "Date", "Quarter", "Month", _
+                "Region", "Store - Location", "Product", "Category", _
+                "Unit Price", "Quantity", "Discount", "Revenue", _
+                "Cost", "Profit", "Stock Level", "Payment Method", _
+                "Customer Type", "Sales Rep", "Additional Notes")
+            
+            For i = 0 To UBound(headers)
+                wsSales.Cells(1, i + 1).Value = headers(i)
+                wsSales.Cells(1, i + 1).Font.Bold = True
+                wsSales.Cells(1, i + 1).Interior.Color = RGB(0, 102, 204)
+                wsSales.Cells(1, i + 1).Font.Color = RGB(255, 255, 255)
+            Next i
+            
+            wsSales.Rows(1).RowHeight = 25
+            wsSales.Rows(1).HorizontalAlignment = xlCenter
+        Else
+            Exit Sub
+        End If
+    End If
+    
+    ' =============================================================
+    ' SAVE DATA TO DATABASE
+    ' =============================================================
+    
+    ' Find last row in Sales Data
+    lastRow = wsSales.Cells(wsSales.Rows.Count, 1).End(xlUp).Row + 1
+    
+    ' Save all 19 fields from G4 to G22
+    For i = 4 To 22
+        wsSales.Cells(lastRow, i - 3).Value = wsData.Cells(i, 7).Value
+    Next i
+    
+    ' Format the new row
+    wsSales.Rows(lastRow).Font.Size = 10
+    wsSales.Columns.AutoFit
+    wsSales.Rows(lastRow).Interior.Color = RGB(230, 245, 230)
+    
+    ' =============================================================
+    ' CONFIRMATION MESSAGE
+    ' =============================================================
+    
+    MsgBox "ENTRY SAVED SUCCESSFULLY!" & vbCrLf & vbCrLf & _
+           "Transaction ID: " & wsData.Range("G4").Value & vbCrLf & _
+           "Saved to 'Sales Data' sheet" & vbCrLf & _
+           "Saved on row: " & lastRow, _
+           vbInformation, "Saved to Database"
+    
+    ' Ask if user wants to clear form for next entry
+    response = MsgBox("Do you want to clear the form for the next entry?" & vbCrLf & _
+                      "This will generate a new Transaction ID.", _
+                      vbQuestion + vbYesNo, "Next Entry")
+    
+    If response = vbYes Then
+        Call ClearFormForNewEntry
+    End If
+    
+    Exit Sub
+    
+ErrorHandler:
+    MsgBox "Error saving to Sales Data: " & Err.Description & vbCrLf & _
+           "Error Number: " & Err.Number, vbCritical, "Save Error"
+    
+End Sub
+
+
+MODULE 2 — ResetForm
+
+' ================================================================
+' SUB: DeleteLastEntryFromSalesData (Delete last entry from database)
+' ================================================================
+Sub DeleteLastEntryFromSalesData()
+    
+    Dim wsSales As Worksheet
+    Dim lastRow As Long
+    Dim response As VbMsgBoxResult
+    Dim deletedTXN As String
+    Dim deletedDate As String
+    Dim deletedProduct As String
+    Dim deletedRevenue As Double
+    
+    On Error GoTo ErrorHandler
+    
+    ' Check if Sales Data worksheet exists
+    On Error Resume Next
+    Set wsSales = ThisWorkbook.Worksheets("Sales Data")
+    On Error GoTo ErrorHandler
+    
+    If wsSales Is Nothing Then
+        MsgBox "? 'Sales Data' worksheet not found!" & vbCrLf & _
+               "No database exists to delete entries from.", _
+               vbCritical, "Database Not Found"
+        Exit Sub
+    End If
+    
+    ' Find the last row with data (excluding header)
+    lastRow = wsSales.Cells(wsSales.Rows.Count, 1).End(xlUp).Row
+    
+    ' Check if there are any entries
+    If lastRow <= 1 Then
+        MsgBox "?? The 'Sales Data' database is empty." & vbCrLf & _
+               "No entries to delete.", _
+               vbInformation, "Empty Database"
+        Exit Sub
+    End If
+    
+    ' Get information about the last entry
+    deletedTXN = wsSales.Cells(lastRow, 1).Value
+    deletedDate = wsSales.Cells(lastRow, 2).Value
+    deletedProduct = wsSales.Cells(lastRow, 7).Value
+    deletedRevenue = wsSales.Cells(lastRow, 12).Value
+    
+    ' Show entry details and confirm deletion
+    response = MsgBox("You are about to delete the LAST entry from the database:" & vbCrLf & vbCrLf & _
+                      "Transaction ID: " & deletedTXN & vbCrLf & _
+                      "Date: " & deletedDate & vbCrLf & _
+                      "Product: " & deletedProduct & vbCrLf & _
+                      "Revenue: $" & Format(deletedRevenue, "#,##0.00") & vbCrLf & _
+                      "Row Number: " & lastRow & vbCrLf & vbCrLf & _
+                      "This action CANNOT be undone!" & vbCrLf & vbCrLf & _
+                      "Are you sure you want to delete this entry?", _
+                      vbExclamation + vbYesNo, "Confirm Deletion")
+    
+    If response = vbYes Then
+        ' Final confirmation with text entry for safety
+        Dim confirmText As String
+        confirmText = InputBox("Type 'DELETE' to confirm deletion of " & deletedTXN & ":", _
+                               "Final Confirmation", "")
+        
+        If confirmText = "DELETE" Then
+            ' Delete the last row
+            wsSales.Rows(lastRow).Delete
+            
+            ' Show success message
+            MsgBox "ENTRY DELETED SUCCESSFULLY!" & vbCrLf & vbCrLf & _
+                   "Deleted: " & deletedTXN & " - " & deletedProduct & vbCrLf & _
+                   "The database has been updated.", _
+                   vbInformation, "Deletion Complete"
+            
+            ' Optional: Update status on Data Entry form if it exists
+            On Error Resume Next
+            Dim wsData As Worksheet
+            Set wsData = ThisWorkbook.Worksheets("Data Entry")
+            If Not wsData Is Nothing Then
+                wsData.Range("F24:G24").Value = "? Last entry deleted: " & deletedTXN
+                wsData.Range("F24:G24").Interior.Color = RGB(255, 200, 200)
+            End If
+            On Error GoTo ErrorHandler
+            
+        Else
+            MsgBox "Deletion cancelled - Incorrect confirmation text.", _
+                   vbExclamation, "Deletion Cancelled"
+        End If
+    Else
+        MsgBox "? Deletion cancelled.", _
+               vbInformation, "Deletion Cancelled"
+    End If
+    
+    Exit Sub
+    
+ErrorHandler:
+    MsgBox "Error deleting entry: " & Err.Description & vbCrLf & _
+           "Error Number: " & Err.Number, _
+           vbCritical, "Deletion Error"
+
+End Sub
+
+
+MODULE 3 — UpdateDashboard
+
+Sub UpdateDashboard()
+    Dim ws As Worksheet
+    Dim pt As PivotTable
+    Dim startTime As Double
+    Dim refreshCount As Long
+    
+    startTime = Timer
+    refreshCount = 0
+    
+    On Error GoTo ErrorHandler
+
+    ' Disable screen updating for faster performance
+    Application.ScreenUpdating = False
+    Application.Calculation = xlCalculationManual
+    Application.EnableEvents = False
+    Application.StatusBar = "Refreshing dashboard and reports..."
+    
+    ' =============================================================
+    ' 1. REFRESH ALL PIVOT TABLES
+    ' =============================================================
+    For Each ws In ThisWorkbook.Sheets
+        ' Skip hidden sheets and specific sheets that don't need refresh
+        If ws.Visible = xlSheetVisible Then
+            For Each pt In ws.PivotTables
+                On Error Resume Next
+                pt.PivotCache.Refresh
+                pt.RefreshTable
+                If Err.Number = 0 Then
+                    refreshCount = refreshCount + 1
+                End If
+                On Error GoTo ErrorHandler
+            Next pt
+        End If
+    Next ws
+    
+    ' =============================================================
+    ' 2. REFRESH SPECIFIC WORKSHEETS (Based on your workbook)
+    ' =============================================================
+    
+    ' Update KPITarget sheet calculations
+    On Error Resume Next
+    If Not ThisWorkbook.Worksheets("KPITarget") Is Nothing Then
+        ThisWorkbook.Worksheets("KPITarget").Calculate
+        refreshCount = refreshCount + 1
+    End If
+    
+    ' Update Analytic Dashboard
+    If Not ThisWorkbook.Worksheets("Analytic Dashboard") Is Nothing Then
+        ThisWorkbook.Worksheets("Analytic Dashboard").Calculate
+        refreshCount = refreshCount + 1
+    End If
+    
+    ' Update Pivot sheet
+    If Not ThisWorkbook.Worksheets("Pivot") Is Nothing Then
+        ThisWorkbook.Worksheets("Pivot").Calculate
+        refreshCount = refreshCount + 1
+    End If
+    
+    ' Update Data Dictionary (if it has formulas)
+    If Not ThisWorkbook.Worksheets("Data Dictionary") Is Nothing Then
+        ThisWorkbook.Worksheets("Data Dictionary").Calculate
+    End If
+    On Error GoTo ErrorHandler
+    
+    ' =============================================================
+    ' 3. ADD REFRESH TIMESTAMP
+    ' =============================================================
+    AddRefreshTimestamp
+    
+    ' =============================================================
+    ' 4. UPDATE DATA SOURCE RANGES FOR PIVOT TABLES
+    ' =============================================================
+    UpdatePivotDataSources
+    
+    ' =============================================================
+    ' 5. RECALCULATE EVERYTHING
+    ' =============================================================
+    Application.CalculateFullRebuild
+    
+    ' =============================================================
+    ' 6. NAVIGATE TO DASHBOARD (if exists)
+    ' =============================================================
+    On Error Resume Next
+    If Not ThisWorkbook.Worksheets("Analytic Dashboard") Is Nothing Then
+        ThisWorkbook.Worksheets("Analytic Dashboard").Activate
+    ElseIf Not ThisWorkbook.Worksheets("Dashboard") Is Nothing Then
+        ThisWorkbook.Worksheets("Dashboard").Activate
+    ElseIf Not ThisWorkbook.Worksheets("KPITarget") Is Nothing Then
+        ThisWorkbook.Worksheets("KPITarget").Activate
+    End If
+    On Error GoTo ErrorHandler
+    
+    ' =============================================================
+    ' 7. SHOW SUCCESS MESSAGE
+    ' =============================================================
+    Dim elapsedTime As Double
+    elapsedTime = Round(Timer - startTime, 2)
+    
+    MsgBox "? DASHBOARD UPDATED SUCCESSFULLY!" & vbCrLf & vbCrLf & _
+           "?? Pivot Tables Refreshed: " & refreshCount & vbCrLf & _
+           "?? All formulas recalculated" & vbCrLf & _
+           "?? Time taken: " & elapsedTime & " seconds" & vbCrLf & _
+           "?? Completed at: " & Format(Now(), "DD-MMM-YYYY HH:MM:SS AM/PM"), _
+           vbInformation, "Dashboard Updated"
+    
+CleanUp:
+    ' Re-enable settings
+    Application.Calculation = xlCalculationAutomatic
+    Application.ScreenUpdating = True
+    Application.EnableEvents = True
+    Application.StatusBar = False
+    
+    Exit Sub
+
+ErrorHandler:
+    MsgBox "? Update Error: " & Err.Description & vbCrLf & _
+           "Error Number: " & Err.Number & vbCrLf & _
+           "Occurred in: " & Err.Source, _
+           vbCritical, "Dashboard Error"
+    
+    Resume CleanUp
+
+End Sub
+
+
+MODULE 4 — Export Report
+
+Sub ExportQuarterlyReport()
+    Dim ws         As Worksheet
+    Dim filePath   As String
+    Dim fileName   As String
+    Dim saveFolder As String
+    Dim quarter    As String
+    Dim shp        As Shape
+    Dim lastRow    As Long
+    Dim lastCol    As Long
+    Dim printRange As Range
+    
+    On Error GoTo ErrorHandler
+
+    ' Disable screen updating for faster performance
+    Application.ScreenUpdating = False
+    Application.Calculation = xlCalculationManual
+    
+    ' Set the dashboard worksheet
+    On Error Resume Next
+    Set ws = ThisWorkbook.Worksheets("Analytic Dashboard")
+    If ws Is Nothing Then
+        Set ws = ThisWorkbook.Worksheets("Dashboard")
+    End If
+    On Error GoTo ErrorHandler
+    
+    If ws Is Nothing Then
+        MsgBox "? Dashboard worksheet not found!", vbCritical, "Export Failed"
+        GoTo CleanUp
+    End If
+    
+    ' Get selected quarter from KPI Targets sheet
+    On Error Resume Next
+    quarter = Trim(ThisWorkbook.Worksheets("KPITarget").Cells(7, 2).Value)
+    If quarter = "" Then
+        quarter = "Q" & Format(Now(), "Q")
+    End If
+    On Error GoTo ErrorHandler
+    
+    ' Determine save folder
+    saveFolder = ThisWorkbook.Path
+    If saveFolder = "" Then
+        ' If workbook not saved yet, use desktop
+        saveFolder = Environ("USERPROFILE") & "\Desktop"
+    End If
+    saveFolder = saveFolder & "\"
+    
+    ' Create filename with timestamp
+    fileName = "FreshMart_" & quarter & "_Report_" & Format(Now(), "YYYY-MM-DD_HHMMSS") & ".pdf"
+    filePath = saveFolder & fileName
+    
+    ' Activate the dashboard sheet
+    ws.Activate
+    
+    ' =============================================================
+    ' MAKE ALL SHAPES VISIBLE
+    ' =============================================================
+    For Each shp In ws.Shapes
+        shp.Visible = True
+    Next shp
+    
+    ' =============================================================
+    ' CALCULATE PRINT AREA (Including all shapes/charts)
+    ' =============================================================
+    
+    ' Reset print area
+    ws.PageSetup.PrintArea = ""
+    
+    ' Initialize lastRow and lastCol with used range
+    If Not ws.UsedRange Is Nothing Then
+        lastRow = ws.UsedRange.Row + ws.UsedRange.Rows.Count - 1
+        lastCol = ws.UsedRange.Column + ws.UsedRange.Columns.Count - 1
+    Else
+        lastRow = 1
+        lastCol = 1
+    End If
+    
+    ' Expand print area to include all shapes
+    For Each shp In ws.Shapes
+        ' Skip any buttons or controls
+        If shp.Type <> msoFormControl And shp.Type <> msoOLEControlObject Then
+            On Error Resume Next
+            If shp.BottomRightCell.Row > lastRow Then
+                lastRow = shp.BottomRightCell.Row
+            End If
+            If shp.BottomRightCell.Column > lastCol Then
+                lastCol = shp.BottomRightCell.Column
+            End If
+            On Error GoTo ErrorHandler
+        End If
+    Next shp
+    
+    ' Add some padding (extra rows and columns)
+    lastRow = lastRow + 2
+    lastCol = lastCol + 1
+    
+    ' Set the print area
+    Set printRange = ws.Range(ws.Cells(1, 1), ws.Cells(lastRow, lastCol))
+    ws.PageSetup.PrintArea = printRange.Address
+    
+    ' =============================================================
+    ' PAGE SETUP OPTIMIZATION
+    ' =============================================================
+    With ws.PageSetup
+        .Orientation = xlLandscape
+        .FitToPagesWide = 1
+        .FitToPagesTall = False
+        .Zoom = False
+        .LeftMargin = Application.InchesToPoints(0.25)
+        .RightMargin = Application.InchesToPoints(0.25)
+        .TopMargin = Application.InchesToPoints(0.5)
+        .BottomMargin = Application.InchesToPoints(0.5)
+        .HeaderMargin = Application.InchesToPoints(0.3)
+        .FooterMargin = Application.InchesToPoints(0.3)
+        .CenterHorizontally = True
+        .CenterVertically = False
+        .PrintTitleRows = "$1:$1"  ' Repeat header row on each page
+    End With
+    
+    ' =============================================================
+    ' EXPORT TO PDF
+    ' =============================================================
+    
+    ' Show progress
+    Application.StatusBar = "Exporting " & quarter & " report to PDF..."
+    
+    ' Export to PDF
+    ws.ExportAsFixedFormat _
+        Type:=xlTypePDF, _
+        fileName:=filePath, _
+        Quality:=xlQualityStandard, _
+        IncludeDocProperties:=True, _
+        IgnorePrintAreas:=False, _
+        OpenAfterPublish:=True
+    
+    ' =============================================================
+    ' SUCCESS MESSAGE
+    ' =============================================================
+    Dim fileSize As String
+    Dim fileSizeKB As Double
+    
+    ' Get file size
+    On Error Resume Next
+    fileSizeKB = Round(FileLen(filePath) / 1024, 2)
+    If fileSizeKB > 1024 Then
+        fileSize = Round(fileSizeKB / 1024, 2) & " MB"
+    Else
+        fileSize = fileSizeKB & " KB"
+    End If
+    On Error GoTo ErrorHandler
+    
+    MsgBox "? QUARTERLY REPORT EXPORTED SUCCESSFULLY!" & vbCrLf & vbCrLf & _
+           "?? Report: FreshMart_" & quarter & "_Report" & vbCrLf & _
+           "?? Quarter: " & quarter & vbCrLf & _
+           "?? Location: " & filePath & vbCrLf & _
+           "?? File Size: " & fileSize & vbCrLf & _
+           "?? Exported: " & Format(Now(), "DD-MMM-YYYY HH:MM:SS AM/PM") & vbCrLf & vbCrLf & _
+           "The PDF has been opened automatically.", _
+           vbInformation, "Export Complete"
+    
+CleanUp:
+    ' Re-enable settings
+    Application.ScreenUpdating = True
+    Application.Calculation = xlCalculationAutomatic
+    Application.StatusBar = False
+    
+    Exit Sub
+
+ErrorHandler:
+    MsgBox "? Error exporting report: " & Err.Description & vbCrLf & _
+           "Error Number: " & Err.Number & vbCrLf & _
+           "Line: " & Erl, _
+           vbCritical, "Export Error"
+    
+    Resume CleanUp
+
+End Sub
+
+
+MODULE 5 — ClearFilters
+
+' ================================================================
+' SUB: ResetDashboardSlicers (Simple version)
+' ================================================================
+
+Sub ResetDashboardSlicers()
+    
+    Dim sc As SlicerCache
+    Dim resetCount As Long
+    
+    On Error GoTo ErrorHandler
+    
+    Application.ScreenUpdating = False
+    resetCount = 0
+    
+    ' Reset all slicer caches in the workbook
+    For Each sc In ThisWorkbook.SlicerCaches
+        sc.ClearManualFilter
+        resetCount = resetCount + 1
+    Next sc
+    
+    Application.ScreenUpdating = True
+    
+    MsgBox "? DASHBOARD SLICERS RESET!" & vbCrLf & vbCrLf & _
+           "?? Slicers reset: " & resetCount, _
+           vbInformation, "Slicers Reset"
+    
+    Exit Sub
+    
+ErrorHandler:
+    Application.ScreenUpdating = True
+    MsgBox "? Error: " & Err.Description, vbCritical, "Error"
+
+End Sub
+
+
+MODULE 6 — AddDataValidation
+
+ ================================================================
+' MODULE: BuildDataEntryForm (No Buttons - Form Only)
+' ================================================================
+Sub BuildDataEntryForm()
+
+    Dim ws As Worksheet
+    Dim lastRow As Long
+    Dim dataFields As Variant
+    Dim validationLists As Variant
+    Dim i As Long
+    Dim nextTXN As String
+    
+    On Error GoTo ErrorHandler
+    Set ws = ThisWorkbook.Worksheets("Data Entry")
+    
+    ' Clear existing content
+    ws.Cells.Clear
+    ws.Cells.Interior.Color = xlNone
+    
+    ' =============================================================
+    ' HEADER SECTION (Rows 1-3)
+    ' =============================================================
+    
+    ' Main Title
+    With ws.Range("F1:G1")
+        .Merge
+        .Value = "DATA ENTRY FORM"
+        .Font.Size = 18
+        .Font.Bold = True
+        .Font.Color = RGB(255, 255, 255)
+        .Interior.Color = RGB(0, 102, 204)
+        .HorizontalAlignment = xlCenter
+        .VerticalAlignment = xlCenter
+        .RowHeight = 40
+    End With
+    
+    ' Instructions
+    With ws.Range("F2:G2")
+        .Merge
+        .Value = "Enter your data in the YELLOW cells below. Gray cells are auto-calculated."
+        .Font.Size = 10
+        .Font.Italic = True
+        .Interior.Color = RGB(240, 240, 240)
+        .HorizontalAlignment = xlCenter
+    End With
+    
+    ' Column Headers
+    ws.Range("F3").Value = "FIELD / DESCRIPTION"
+    ws.Range("G3").Value = "VALUE / SELECTION"
+    ws.Range("F3:G3").Font.Bold = True
+    ws.Range("F3:G3").Font.Size = 12
+    ws.Range("F3:G3").Interior.Color = RGB(0, 102, 204)
+    ws.Range("F3:G3").Font.Color = RGB(255, 255, 255)
+    ws.Range("F3:G3").HorizontalAlignment = xlCenter
+    
+    ' =============================================================
+    ' DATA FIELDS (Starting Row 4)
+    ' =============================================================
+    
+    ' Define fields and their validation types
+    dataFields = Array( _
+        "Transaction ID", _
+        "Date", _
+        "Quarter", _
+        "Month", _
+        "Region", _
+        "Store - Location", _
+        "Product", _
+        "Category", _
+        "Unit Price", _
+        "Quantity", _
+        "Discount (%)", _
+        "REVENUE (Auto-calc)", _
+        "COST (Auto-calc)", _
+        "PROFIT (Auto-calc)", _
+        "Stock Level", _
+        "Payment Method", _
+        "Customer Type", _
+        "Sales Rep", _
+        "Additional Notes")
+    
+    ' Add field names to Column F (starting row 4)
+    For i = 0 To UBound(dataFields)
+        ws.Cells(i + 4, 6).Value = dataFields(i)  ' Column F = 6
+        ws.Cells(i + 4, 6).Font.Bold = True
+        ws.Cells(i + 4, 6).Font.Size = 11
+        ws.Cells(i + 4, 6).Interior.Color = RGB(220, 230, 250)  ' Light blue background
+        ws.Cells(i + 4, 6).Borders.LineStyle = xlContinuous
+    Next i
+    
+    ' =============================================================
+    ' GENERATE NEXT TRANSACTION ID
+    ' =============================================================
+    nextTXN = GetNextTransactionID(ws)
+    
+    ' =============================================================
+    ' SETUP VALIDATIONS AND FORMULAS (Column G)
+    ' =============================================================
+    
+    ' Clear and prepare Column G (values column)
+    ws.Range("G4:G" & (4 + UBound(dataFields))).Clear
+    ws.Range("G4:G" & (4 + UBound(dataFields))).Validation.Delete
+    
+    ' 1. Transaction ID (Row 4) - Auto-generate
+    ws.Cells(4, 7).Value = nextTXN
+    ws.Cells(4, 7).Font.Bold = True
+    ws.Cells(4, 7).Interior.Color = RGB(200, 230, 200)
+    ws.Cells(4, 7).Locked = True
+    
+    ' 2. Date (Row 5) - Date validation
+    With ws.Cells(5, 7).Validation
+        .Delete
+        .Add Type:=xlValidateDate, AlertStyle:=xlValidAlertStop, _
+             Operator:=xlLessEqual, Formula1:=Date
+        .InputTitle = "Date Entry"
+        .ErrorTitle = "Invalid Date"
+        .InputMessage = "Enter a date (today or earlier)"
+        .ErrorMessage = "Date must be today or earlier!"
+    End With
+    ws.Cells(5, 7).Value = Date
+    
+    ' 3. Quarter (Row 6) - Dropdown
+    With ws.Cells(6, 7).Validation
+        .Delete
+        .Add Type:=xlValidateList, AlertStyle:=xlValidAlertStop, _
+             Formula1:="Q1, Q2, Q3, Q4"
+        .InputTitle = "Select Quarter"
+        .InputMessage = "Choose the appropriate quarter"
+    End With
+    
+    ' 4. Month (Row 7) - Dropdown
+    With ws.Cells(7, 7).Validation
+        .Delete
+        .Add Type:=xlValidateList, AlertStyle:=xlValidAlertStop, _
+             Formula1:="1,2,3,4,5,6,7,8,9,10,11,12"
+        .InputTitle = "Select Month"
+        .InputMessage = "Choose the month"
+    End With
+    
+    ' 5. Region (Row 8) - Dropdown
+    With ws.Cells(8, 7).Validation
+        .Delete
+        .Add Type:=xlValidateList, AlertStyle:=xlValidAlertStop, _
+             Formula1:="North,South,East,West,Central"
+        .InputTitle = "Select Region"
+        .InputMessage = "Choose the region"
+    End With
+    
+    ' 6. Store - Location (Row 9) - Text input
+    ws.Cells(9, 7).Interior.Color = RGB(255, 255, 200)
+    
+    ' 7. Product (Row 10) - Dynamic list
+    On Error Resume Next
+    With ws.Cells(10, 7).Validation
+        .Delete
+        .Add Type:=xlValidateList, AlertStyle:=xlValidAlertStop, _
+             Formula1:="=Products!A:A"
+        .InputTitle = "Select Product"
+        .InputMessage = "Choose from product list"
+    End With
+    On Error GoTo ErrorHandler
+    
+    ' 8. Category (Row 11) - Dropdown
+    With ws.Cells(11, 7).Validation
+        .Delete
+        .Add Type:=xlValidateList, AlertStyle:=xlValidAlertStop, _
+             Formula1:="Grains & Staples,Bakery,Dairy,Meat & Poultry,Seafood,Beverages,Fruits & Veg,Frozen Foods,Personal Care,Household,Baby Products"
+        .InputTitle = "Select Category"
+        .InputMessage = "Choose product category"
+    End With
+    
+    ' 9. Unit Price (Row 12) - Numeric
+    With ws.Cells(12, 7).Validation
+        .Delete
+        .Add Type:=xlValidateDecimal, AlertStyle:=xlValidAlertStop, _
+             Operator:=xlGreaterEqual, Formula1:="0"
+        .InputTitle = "Unit Price"
+        .InputMessage = "Enter price per unit (must be >= 0)"
+        .ErrorMessage = "Price must be zero or greater!"
+    End With
+    
+    ' 10. Quantity (Row 13) - Numeric
+    With ws.Cells(13, 7).Validation
+        .Delete
+        .Add Type:=xlValidateDecimal, AlertStyle:=xlValidAlertStop, _
+             Operator:=xlGreaterEqual, Formula1:="0"
+        .InputTitle = "Quantity"
+        .InputMessage = "Enter quantity (must be >= 0)"
+        .ErrorMessage = "Quantity must be zero or greater!"
+    End With
+    
+    ' 11. Discount (Row 14) - Percentage
+    With ws.Cells(14, 7).Validation
+        .Delete
+        .Add Type:=xlValidateDecimal, AlertStyle:=xlValidAlertStop, _
+             Operator:=xlBetween, Formula1:="0", Formula2:="0.15"
+        .InputTitle = "Discount"
+        .InputMessage = "Enter discount (0% to 15%) as decimal (e.g., 0.10 = 10%)"
+        .ErrorMessage = "Discount must be between 0% and 15%!"
+    End With
+    
+    ' 12. REVENUE (Row 15) - Formula
+    ws.Cells(15, 7).Formula = "=IF(AND(G12>0,G13>0),G12*G13*(1-G14),"""")"
+    ws.Cells(15, 7).Interior.Color = RGB(220, 220, 220)
+    ws.Cells(15, 7).Locked = True
+    
+    ' 13. COST (Row 16) - Formula
+    ws.Cells(16, 7).Formula = "=IF(G15>0,G15*0.6,"""")"
+    ws.Cells(16, 7).Interior.Color = RGB(220, 220, 220)
+    ws.Cells(16, 7).Locked = True
+    
+    ' 14. PROFIT (Row 17) - Formula
+    ws.Cells(17, 7).Formula = "=IF(AND(G15>0,G16>0),G15-G16,"""")"
+    ws.Cells(17, 7).Interior.Color = RGB(220, 220, 220)
+    ws.Cells(17, 7).Locked = True
+    
+    ' 15. Stock Level (Row 18) - Numeric
+    With ws.Cells(18, 7).Validation
+        .Delete
+        .Add Type:=xlValidateDecimal, AlertStyle:=xlValidAlertStop, _
+             Operator:=xlGreaterEqual, Formula1:="0"
+        .InputTitle = "Stock Level"
+        .InputMessage = "Enter current stock level"
+    End With
+    
+    ' 16. Payment Method (Row 19) - Dropdown
+    With ws.Cells(19, 7).Validation
+        .Delete
+        .Add Type:=xlValidateList, AlertStyle:=xlValidAlertStop, _
+             Formula1:="Cash,Credit Card,Debit Card,Mobile Pay,Voucher,Online"
+        .InputTitle = "Payment Method"
+        .InputMessage = "Select payment method"
+    End With
+    
+    ' 17. Customer Type (Row 20) - Dropdown
+    With ws.Cells(20, 7).Validation
+        .Delete
+        .Add Type:=xlValidateList, AlertStyle:=xlValidAlertStop, _
+             Formula1:="Regular,New,Loyalty Member,Wholesale,Online"
+        .InputTitle = "Customer Type"
+        .InputMessage = "Select customer type"
+    End With
+    
+    ' 18. Sales Rep (Row 21) - Dropdown
+    With ws.Cells(21, 7).Validation
+        .Delete
+        .Add Type:=xlValidateList, AlertStyle:=xlValidAlertStop, _
+             Formula1:="John Smith,Sarah Jones,Mike Brown,Lisa Davis,Tom Wilson,Emma Clark"
+        .InputTitle = "Sales Representative"
+        .InputMessage = "Select assigned sales rep"
+    End With
+    
+    ' 19. Additional Notes (Row 22) - Free text
+    ws.Cells(22, 7).Interior.Color = RGB(255, 255, 200)
+    
+    ' =============================================================
+    ' FORMATTING Column G (Values)
+    ' =============================================================
+    
+    ' Apply yellow background to input cells
+    For i = 4 To 22
+        If i <> 4 And i <> 15 And i <> 16 And i <> 17 Then
+            ws.Cells(i, 7).Interior.Color = RGB(255, 255, 200)
+        End If
+        ws.Cells(i, 7).Borders.LineStyle = xlContinuous
+    Next i
+    
+    ' Number formatting
+    ws.Range("G12:G14").NumberFormat = "#,##0.00"
+    ws.Range("G15:G17").NumberFormat = "#,##0.00"
+    ws.Range("G13").NumberFormat = "#,##0"
+    ws.Range("G18").NumberFormat = "#,##0"
+    
+    ' =============================================================
+    ' FINAL FORMATTING
+    ' =============================================================
+    
+    ws.Columns("F").ColumnWidth = 35
+    ws.Columns("G").ColumnWidth = 45
+    
+    ws.Range("F3:G3").AutoFilter
+    ws.Range("F4").Select
+    ActiveWindow.FreezePanes = True
+    
+    ws.Protect UserInterfaceOnly:=True, AllowFiltering:=True, AllowFormattingCells:=True
+    ws.Range("G4,G12:G22").Locked = False
+    ws.Range("G4").Locked = True
+    
+    ws.Range("G5").Select
+    
+    MsgBox "DATA ENTRY FORM BUILT SUCCESSFULLY!" & vbCrLf & vbCrLf & _
+           "Fields are in Column F" & vbCrLf & _
+           "Enter values in Column G (yellow cells)" & vbCrLf & _
+           "Gray cells are auto-calculated" & vbCrLf & _
+           "Next Transaction ID: " & nextTXN, _
+           vbInformation, "Form Ready"
+    
+    Exit Sub
+
+ErrorHandler:
+    If Err.Number = 9 Then
+        MsgBox "Error: 'Data Entry' worksheet not found." & vbCrLf & _
+               "Please create a worksheet named 'Data Entry' and try again.", _
+               vbCritical, "Missing Worksheet"
+    Else
+        MsgBox "Error " & Err.Number & ": " & Err.Description, vbCritical, "Build Form Error"
+    End If
+
+End Sub
+
+
+
+MODULE 7 — HighlightStockRisk
+
+Sub HighlightStockRisk()
+    Dim wsDB      As Worksheet
+    Dim tbl       As ListObject
+    Dim riskCol   As Long
+    Dim i         As Long
+    Dim riskCount As Integer
+    Dim lastRow   As Long
+    Dim lastCol   As Long
+    
+    On Error GoTo ErrorHandler
+
+    ' Disable screen updating for faster performance
+    Application.ScreenUpdating = False
+    
+    ' Set the worksheet
+    On Error Resume Next
+    Set wsDB = ThisWorkbook.Worksheets("SalesData")
+    If wsDB Is Nothing Then
+        Set wsDB = ThisWorkbook.Worksheets("Sales Data")
+    End If
+    On Error GoTo ErrorHandler
+    
+    If wsDB Is Nothing Then
+        MsgBox "? Sales Data worksheet not found!", vbCritical, "Error"
+        Exit Sub
+    End If
+    
+    ' Try to find the table
+    On Error Resume Next
+    Set tbl = wsDB.ListObjects("SalesTable")
+    If tbl Is Nothing Then
+        Set tbl = wsDB.ListObjects("Table1")
+    End If
+    On Error GoTo ErrorHandler
+    
+    riskCount = 0
+    riskCol = 15  ' Stock Level = column 15 (Column O)
+    
+    ' Check if table exists
+    If Not tbl Is Nothing Then
+        ' Clear previous highlights
+        tbl.DataBodyRange.Interior.ColorIndex = xlNone
+        tbl.DataBodyRange.Font.ColorIndex = xlAutomatic
+        
+        ' Loop all rows and flag risky stock
+        For i = 1 To tbl.ListRows.Count
+            If i <= tbl.DataBodyRange.Rows.Count Then
+                If IsNumeric(tbl.DataBodyRange.Cells(i, riskCol).Value) Then
+                    If tbl.DataBodyRange.Cells(i, riskCol).Value < 20 And _
+                       tbl.DataBodyRange.Cells(i, riskCol).Value <> "" Then
+                        tbl.ListRows(i).Range.Interior.Color = RGB(255, 200, 200)
+                        tbl.ListRows(i).Range.Font.Color = RGB(180, 0, 0)
+                        riskCount = riskCount + 1
+                    End If
+                End If
+            End If
+        Next i
+    Else
+        ' If no table exists, use regular range
+        lastRow = wsDB.Cells(wsDB.Rows.Count, 1).End(xlUp).Row
+        lastCol = wsDB.Cells(1, wsDB.Columns.Count).End(xlToLeft).Column
+        
+        If lastRow <= 1 Then
+            MsgBox "No data found in Sales Data sheet!", vbExclamation, "Empty Database"
+            GoTo CleanUp
+        End If
+        
+        ' Clear previous highlights
+        wsDB.Range("A2:" & GetColumnLetter(lastCol) & lastRow).Interior.ColorIndex = xlNone
+        wsDB.Range("A2:" & GetColumnLetter(lastCol) & lastRow).Font.ColorIndex = xlAutomatic
+        
+        ' Loop through rows
+        For i = 2 To lastRow
+            If IsNumeric(wsDB.Cells(i, riskCol).Value) Then
+                If wsDB.Cells(i, riskCol).Value < 20 And wsDB.Cells(i, riskCol).Value <> "" Then
+                    wsDB.Range(wsDB.Cells(i, 1), wsDB.Cells(i, lastCol)).Interior.Color = RGB(255, 200, 200)
+                    wsDB.Range(wsDB.Cells(i, 1), wsDB.Cells(i, lastCol)).Font.Color = RGB(180, 0, 0)
+                    riskCount = riskCount + 1
+                End If
+            End If
+        Next i
+    End If
+
+    ' Show result message
+    If riskCount = 0 Then
+        MsgBox "? No stock risk found!" & vbCrLf & vbCrLf & _
+               "All products have Stock Level >= 20.", _
+               vbInformation, "Stock Check Complete"
+    Else
+        MsgBox "?? STOCK RISK ALERT!" & vbCrLf & vbCrLf & _
+               "?? " & riskCount & " row(s) flagged (Stock < 20)" & vbCrLf & _
+               "?? Rows highlighted in red on Sales Data sheet." & vbCrLf & vbCrLf & _
+               "Recommendation: Review and reorder low stock items.", _
+               vbExclamation, "Stock Risk Found"
+    End If
+    
+CleanUp:
+    Application.ScreenUpdating = True
+    Exit Sub
+    
+ErrorHandler:
+    Application.ScreenUpdating = True
+    MsgBox "? Error: " & Err.Description & vbCrLf & _
+           "Error Number: " & Err.Number, vbCritical, "Error"
+    
+End Sub
+
+
+
