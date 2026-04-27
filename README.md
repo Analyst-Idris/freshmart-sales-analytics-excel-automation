@@ -1,172 +1,239 @@
-# Freshmart-Sales-Analytics-Excel-Automation
+# FreshMart Retail Sales Analytics & Excel Automation
 
-<img width="1254" height="836" alt="Image" src="https://github.com/user-attachments/assets/ea0cb078-a441-44ba-93c6-ed97adc6a8cf" />
+<img width="1254" height="836" alt="Dashboard Preview" src="https://github.com/user-attachments/assets/ea0cb078-a441-44ba-93c6-ed97adc6a8cf" />
 
----
-
-## BUSINESS SCENARIO
-
-**Company:** FreshMart Supermarkets Ltd
-**Industry:** Grocery & Retail
-**Headquarters:** Birmingham, United Kingdom
-**Operations:** 10 stores across 5 regions — North, South, East, West, Central
-
-FreshMart is a mid-sized supermarket chain operating 10 stores across the UK.
-Every quarter, the Regional Sales Manager receives a raw transaction file from
-the POS system containing thousands of rows of sales data across products,
-categories, stores, and sales reps.
-
-The current process is entirely manual; the manager copies data into a blank
-spreadsheet, builds ad-hoc charts, and emails a Word document summary to the
-board. This takes 2–3 days every quarter and is highly error-prone.
-
-**The Ask:** Build a professional Excel-based Quarterly Sales Analytics Solution
-that automates the entire reporting process from data entry to board-ready PDF.
+> An end-to-end Excel analytics solution that transforms manual retail reporting into an automated, insight-driven system using PivotTables, dashboards, and VBA.
 
 ---
 
-## PROJECT OBJECTIVES
+## Overview
 
-1. Centralise all quarterly sales transactions in a structured Excel database
-2. Build an interactive dashboard with dynamic KPI targets the manager can update
-3. Enable drill-down analysis by Region, Category, Quarter, and Store
-4. Automate quarterly PDF report generation with one click
-5. Add a data entry form so new transactions can be logged directly in Excel
-6. Validate all data entry to prevent errors at the source
+FreshMart Supermarkets Ltd is a mid-sized UK grocery chain operating across multiple regions. Quarterly reporting was previously a **manual, time-intensive process**, requiring 2–3 days to compile, analyze, and present sales performance.
 
----
+This project delivers a **fully automated Excel-based analytics system** that:
 
-## 📊 DATASET OVERVIEW
-
-**File:** retail_sales_data.csv 
-**Rows:** 2,000 transactions (500 per quarter)
-**Period:** Full Year 2024 — Q1 through Q4
-**Columns:** 18 fields
-
-| # | Column | Type | Description |
-|---|--------|------|-------------|
-| 1 | Transaction ID | Text | Unique ID per sale (TXN1000+) |
-| 2 | Date | Date | Transaction date (YYYY-MM-DD) |
-| 3 | Quarter | Text | Q1, Q2, Q3, Q4 |
-| 4 | Month | Integer | Month number (1–12) |
-| 5 | Region | Text | North, South, East, West, Central |
-| 6 | Store | Text | Store name and location |
-| 7 | Product | Text | Product name |
-| 8 | Category | Text | Product category (9 categories) |
-| 9 | Unit Price | Decimal | Price per unit in GBP |
-| 10 | Quantity | Integer | Units sold per transaction |
-| 11 | Discount | Decimal | Discount applied (0–0.15) |
-| 12 | Revenue | Decimal | Net revenue after discount |
-| 13 | Cost | Decimal | Cost of goods sold |
-| 14 | Profit | Decimal | Revenue minus Cost |
-| 15 | Stock Level | Integer | Remaining stock units |
-| 16 | Payment Method | Text | Cash, Card, Mobile Pay, Voucher |
-| 17 | Customer Type | Text | Regular, New, Loyalty Member, Online |
-| 18 | Sales Rep | Text | Name of sales representative |
+- Centralizes transactional data  
+- Enables real-time performance tracking  
+- Automates reporting workflows  
+- Produces board-ready outputs with one click  
 
 ---
 
-## WORKBOOK STRUCTURE (6 Sheets)
+## Business Scenario
 
-| Sheet | Description | 
-|-------|-----------|
-| **Data Entry** | Data entry form for new transactions |
-| **Sales Data** | Master database — all transactions |
-| **KPI Targets** | Dynamic targets the manager sets each quarter |
-| **Pivot Analytics** | PivotTables powering all charts |
-| **Dashboard** | Interactive quarterly dashboard with slicers |
+**Company:** FreshMart Supermarkets Ltd  
+**Industry:** Grocery & Retail  
+**Location:** Birmingham, United Kingdom  
+**Operations:** 10 stores across 5 regions  
+
+The Regional Sales Manager receives raw POS transaction data each quarter. The existing workflow involves:
+
+- Manual data cleaning and structuring  
+- Building ad-hoc charts in Excel  
+- Creating summary reports in Word  
+
+This approach is:
+- Time-consuming  
+- Error-prone  
+- Not scalable  
+
+---
+
+##  Project Objectives
+
+- Build a **centralized sales database** for all transactions  
+- Develop an **interactive dashboard** with dynamic KPI tracking  
+- Enable **multi-dimensional analysis** (Region, Category, Store, Quarter)  
+- Automate **quarterly report generation (PDF export)**  
+- Implement a **data entry system with validation controls**  
+- Reduce reporting time from days to minutes  
+
+---
+
+## Dataset Overview
+
+- **File:** `retail_sales_data.csv`  
+- **Records:** 2,000 transactions  
+- **Time Period:** Full Year 2024 (Q1–Q4)  
+- **Fields:** 18 columns  
+
+Key metrics captured include revenue, cost, profit, stock levels, and customer segmentation.
+
+---
+
+## System Architecture
+
+### Workbook Structure
+
+<img width="667" height="61" alt="Image" src="https://github.com/user-attachments/assets/0a05f08b-5a2f-46ef-a675-dedd6e01c3a8" />
+
+
+
+| Sheet | Description |
+|------|------------|
+| **Data Entry** | Structured form for inputting new transactions |
+| **Sales Data** | Centralized transaction database |
+| **KPI Targets** | Editable performance targets |
+| **Pivot Analytics** | Backend PivotTables powering visuals |
+| **Dashboard** | Interactive analytics interface |
 | **Data Dictionary** | Field definitions and validation rules |
 
----
-
-## DASHBOARD KPI CARDS (6 Cards)
-
-1. Total Revenue
-2. Total Profit
-3. Profit Margin %
-4. Total Transactions
-5. Top Performing Region
-6. Best Selling Category
+> The system follows a clear flow: **Input → Storage → Processing → Visualization → Reporting**
 
 ---
 
-## CHARTS ON DASHBOARD (6 Charts)
+## Solution Walkthrough
 
-1. **Revenue by Region** 
-2. **Top 10 Products by Revenue**
-3. **Sales by Category** 
-4. **Monthly Revenue Trend** 
-5. **Profit Margin by Region**
+### Data Entry Form
+<img width="601" height="642" alt="Image" src="https://github.com/user-attachments/assets/3acb8419-7270-4dab-8ccf-51626eafe61a" />
 
----
-
-## SLICERS (2 Interactive Filters)
-
-- Customer Type
-- Payment Method
+> Structured input interface with dropdown validation and automated calculations.
 
 ---
 
-## VBA AUTOMATION MODULES
+### Sales Data Table
+<img width="1670" height="876" alt="Image" src="https://github.com/user-attachments/assets/41ad1091-0443-4dfc-ac66-0951ab9b2d3f" />
 
-### MODULE 1 — SubmitTransaction
-Validates and saves new transactions from the Data Entry sheet to the Sales Data table
-
-### MODULE 2 — ResetForm
-Deletes last submitted record + clears Data Entry form
-
-### MODULE 3 — UpdateDashboard
-Refreshes all PivotTables, recalculates KPI targets, and updates charts
-
-### MODULE 4 — ExportQuarterlyReport
-Exports Dashboard as timestamped PDF to project folder
-
-### MODULE 5 — ClearFilters
-
-Clears all applied filters from tables and PivotTables across the workbook
-
-### MODULE 6 — AddDataValidation
-Sets all dropdowns and number rules on the Data Entry sheet (run once)
-
-### MODULE 7 — HighlightStockRisk
-Scans Sales Data, highlights rows where Stock Level < 20 in red
+> Centralized dataset serving as the single source of truth.
 
 ---
 
-## DYNAMIC KPI TARGETS 
+### KPI Targets
+<img width="850" height="495" alt="Image" src="https://github.com/user-attachments/assets/9a69edbb-27e0-4311-afcd-869166126546" />
 
-The manager fills in these cells each quarter — all dashboard cards
-and charts automatically update to show the current values:
-
----
-
-## DATA VALIDATION — Data Entry SHEET DROPDOWNS
-
-| Field | Dropdown Options |
-|-------|-----------------|
-| Quarter | Q1, Q2, Q3, Q4 |
-| Region | North, South, East, West, Central |
-| Store | Dynamic based on region selected |
-| Category | 9 categories |
-| Payment Method | Cash, Card, Mobile Pay, Voucher |
-| Customer Type | Regular, New, Loyalty Member, Online |
-| Sales Rep |  Rep names |
+> Editable quarterly targets that dynamically drive dashboard metrics.
 
 ---
 
-## KEY BUSINESS QUESTIONS ANSWERED
+### Dashboard
+<img width="1633" height="736" alt="Image" src="https://github.com/user-attachments/assets/3833ddc0-6d07-4351-8396-5fc15eb8dec3" />
 
-1. Which region generates the most revenue each quarter?
-2. Which product category has the highest profit margin?
-3. Which stores are underperforming vs KPI targets?
-4. Which sales reps are hitting their numbers?
-5. What is the month-on-month revenue trend?
-6. Which products are at risk of stockout?
-7. Are loyalty members spending more than new customers?
-8. Which payment method is most popular?
+> Interactive dashboard with slicers, KPIs, and performance insights.
 
 ---
 
+##  Key Features
+
+### Dashboard KPIs
+- Total Revenue  
+- Total Cost
+- Profit Margin %  
+- Total Transactions 
+
+---
+
+### Visual Analytics
+- Revenue by Region  
+- Top 10 Products  
+- Sales by Category  
+- Monthly Revenue Trend  
+- Profit Margin by Region  
+
+---
+
+### Interactive Filters
+- Customer Type  
+- Payment Method  
+
+---
+
+## Automation (VBA)
+
+| Module | Function |
+|-------|--------|
+| SubmitTransaction | Validates and records new transactions |
+| ResetForm | Clears input form and resets entries |
+| UpdateDashboard | Refreshes PivotTables and charts |
+| ExportQuarterlyReport | Generates PDF reports |
+| ClearFilters | Resets all filters across workbook |
+| AddDataValidation | Applies dropdowns and rules |
+| HighlightStockRisk | Flags low-stock items |
+
+---
+
+## Data Validation & Integrity
+
+- Controlled dropdown inputs (Region, Category, Payment, etc.)  
+- Numeric constraints on price, quantity, and discount  
+- Automated calculations for derived metrics  
+- Error prevention at point of entry  
+
+---
+
+## Business Insights Enabled
+
+This solution answers key business questions such as:
+
+- Which regions drive the highest revenue?  
+- Which categories yield the best margins?  
+- Which stores are underperforming?  
+- Which products are at risk of stockout?  
+- How do customer segments behave?  
+
+---
+
+## Impact
+
+| Before | After |
+|------|------|
+| Manual reporting (2–3 days) | Automated reporting (minutes) |
+| Static analysis | Interactive dashboard |
+| High error risk | Validated data entry |
+| Disconnected workflow | Fully integrated system |
+
+---
+
+## Project Structure
+
+ FreshMart-Sales-Analytics
+ 
+├──  README.md
+
+├──  VBA_MODULES.md
+
+├──  assets/images/
+
+└──  FreshMart_Analytics.xlsm
 
 
 
+---
+
+## How to Use
+
+1. Open the `.xlsm` file and enable macros  
+2. Use **Data Entry** to input transactions  
+3. Click **Update Dashboard** to refresh analytics  
+4. Export reports using VBA buttons  
+
+---
+
+## Key Skills Demonstrated
+
+- Advanced Excel (PivotTables, dashboards)  
+- VBA automation & workflow design  
+- Data modeling and validation  
+- Business analysis & KPI design  
+- Reporting automation  
+
+---
+
+## Additional Documentation
+
+- VBA Modules: https://github.com/Analyst-Idris/freshmart-sales-analytics-excel-automation/blob/main/VBA_MODULES
+---
+
+## Collaboration & Contact
+
+I am open to collaborating on data analytics, Excel automation, and dashboard development projects.
+
+- Email: oladejoidris55@gmail.com 
+- LinkedIn: https://www.linkedin.com/in/oladejo-idris-191a6024a/
+- GitHub: https://x.com/im_classic24
+- WhatsApp: wa.me/2347025062857  
+
+---
+
+## Summary
+
+This project demonstrates how Excel can be transformed into a **powerful analytics and automation platform**, bridging the gap between raw data and executive-level insights.
